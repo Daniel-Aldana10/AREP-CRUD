@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Properties CRUD</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; margin: 20px; }
+        h1 { font-size: 20px; }
+        form { display: grid; gap: 8px; max-width: 560px; margin-bottom: 16px; }
+        label { font-weight: 600; }
+        input, textarea { padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
+        button { padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; }
+        button.primary { background: #2563eb; color: white; }
+        button.ghost { background: #f3f4f6; }
+        table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+        th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+        tr:nth-child(even) { background: #fafafa; }
+        .row { display:flex; gap:12px; align-items:center; }
+        .small { font-size: 13px; color: #555; }
+        .error { color: #b91c1c; }
+        .success { color: #047857; }
+    </style>
+</head>
+<body>
+<h1>Properties CRUD</h1>
+<section>
+    <h2>Crear propiedad</h2>
+    <form id="createForm">
+        <label>Address <input type="text" id="c_address" required></label>
+        <label>Price <input type="number" id="c_price" step="0.01" required></label>
+        <label>Size <input type="number" id="c_size" step="0.01" required></label>
+        <label>Description <textarea id="c_description" rows="2"></textarea></label>
+        <div class="row">
+            <button type="submit" class="primary">Crear</button>
+            <button type="button" id="btnRefresh" class="ghost">Refrescar lista</button>
+        </div>
+        <div id="createMsg"></div>
+    </form>
+</section>
+
+<section>
+    <h2>Buscar / Actualizar / Eliminar</h2>
+    <form id="modForm">
+        <label>ID <input type="number" id="m_id" required></label>
+        <div class="row">
+            <button type="button" id="btnGet">Buscar</button>
+            <button type="button" id="btnDelete">Eliminar</button>
+        </div>
+
+        <label>Address <input type="text" id="m_address"></label>
+        <label>Price <input type="number" id="m_price" ></label>
+        <label>Size <input type="number" id="m_size" ></label>
+        <label>Description <textarea id="m_description" rows="2"></textarea></label>
+        <div class="row">
+            <button type="button" id="btnUpdate" class="primary">Actualizar</button>
+        </div>
+        <div id="modMsg"></div>
+    </form>
+</section>
+
+<section>
+    <h2>Listado de propiedades</h2>
+    <table id="tbl">
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Address</th>
+            <th>Price</th>
+            <th>Size</th>
+            <th>Description</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+    <div id="listMsg"></div>
+</section>
+
+<script>
+
+    const API_BASE = 'http://localhost:8080/properties';
+
+    // Utils
+    function showMessage(el, text, cls=''){
+      el.textContent = text;
+      el.className = cls;
+      if (text) setTimeout(()=>{ el.textContent=''; el.className=''; }, 4000);
+    }
+
+    // Fetch list
+    async function fetchList(){
+      const tbody = document.querySelector('#tbl tbody');
+      tbody.innerHTML = '';
+      try{
+        const res = await fetch(API_BASE);
+        if (!res.ok) throw new Error('Error al obtener lista: ' + res.status);
+        const list = await res.json();
+        if (Array.isArray(list) && list.length){
+          list.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${p.id ?? ''}</td>
+              <td>${escapeHtml(p.address ?? '')}</td>
+              <td>${p.price ?? ''}</td>
+              <td>${p.size ?? ''}</td>
+              <td>${escapeHtml(p.description ?? '')}</td>
+              <td>
+                <button data-id="${p.id}" class="btn-edit">Editar</button>
+                <button data-id="${p.id}" class="btn-del">Eliminar</button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td colspan="6" class="small">No hay propiedades</td>';
+          tbody.appendChild(tr);
+        }
+      } catch(err){
+        showMessage(document.getElementById('listMsg'), err.message, 'error');
+      }
+    }
+
+    // Create
+    document.getElementById('createForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const address = document.getElementById('c_address').value.trim();
+      const price = parseFloat(document.getElementById('c_price').value);
+      const size = parseFloat(document.getElementById('c_size').value);
+      const description = document.getElementById('c_description').value.trim();
+
+      // Validación simple cliente
+      if (!address) return showMessage(document.getElementById('createMsg'), 'Address es requerido', 'error');
+      if (!isFinite(price) || price <= 0) return showMessage(document.getElementById('createMsg'), 'Price debe ser número positivo', 'error');
+      if (!isFinite(size) || size <= 0) return showMessage(document.getElementById('createMsg'), 'Size debe ser número positivo', 'error');
+
+      try{
+        const res = await fetch(API_BASE, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address, price, size, description })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({error: res.statusText}));
+          throw new Error(err.error || res.statusText || 'Error al crear');
+        }
+        const created = await res.json();
+        showMessage(document.getElementById('createMsg'), 'Creada con ID ' + created.id, 'success');
+        document.getElementById('createForm').reset();
+        fetchList();
+      }catch(err){
+        showMessage(document.getElementById('createMsg'), err.message, 'error');
+      }
+    });
+
+    // Buscar por ID
+    document.getElementById('btnGet').addEventListener('click', async ()=>{
+      const id = parseInt(document.getElementById('m_id').value, 10);
+      if (!id) return showMessage(document.getElementById('modMsg'), 'ID inválido', 'error');
+      try{
+        const res = await fetch(API_BASE + '/' + id);
+        if (!res.ok) throw new Error('No encontrado: ' + res.status);
+        const p = await res.json();
+        document.getElementById('m_address').value = p.address ?? '';
+        document.getElementById('m_price').value = p.price ?? '';
+        document.getElementById('m_size').value = p.size ?? '';
+        document.getElementById('m_description').value = p.description ?? '';
+        showMessage(document.getElementById('modMsg'), 'Propiedad cargada', 'success');
+      }catch(err){
+        showMessage(document.getElementById('modMsg'), err.message, 'error');
+      }
+    });
+
+    // Update
+    document.getElementById('btnUpdate').addEventListener('click', async ()=>{
+      const id = parseInt(document.getElementById('m_id').value, 10);
+      const address = document.getElementById('m_address').value.trim();
+      const price = parseFloat(document.getElementById('m_price').value);
+      const size = parseFloat(document.getElementById('m_size').value);
+      const description = document.getElementById('m_description').value.trim();
+
+      if (!id) return showMessage(document.getElementById('modMsg'), 'ID inválido', 'error');
+      if (!address) return showMessage(document.getElementById('modMsg'), 'Address es requerido', 'error');
+      if (!isFinite(price) || price <= 0) return showMessage(document.getElementById('modMsg'), 'Price debe ser número positivo', 'error');
+      if (!isFinite(size) || size <= 0) return showMessage(document.getElementById('modMsg'), 'Size debe ser número positivo', 'error');
+
+      try{
+        const res = await fetch(API_BASE + '/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, address, price, size, description })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(()=>({error: res.statusText}));
+          throw new Error(err.error || res.statusText || 'Error al actualizar');
+        }
+        const updated = await res.json();
+        showMessage(document.getElementById('modMsg'), 'Actualizada ID ' + updated.id, 'success');
+        fetchList();
+      }catch(err){
+        showMessage(document.getElementById('modMsg'), err.message, 'error');
+      }
+    });
+
+    // Delete (from form)
+    document.getElementById('btnDelete').addEventListener('click', async ()=>{
+      const id = parseInt(document.getElementById('m_id').value, 10);
+      if (!id) return showMessage(document.getElementById('modMsg'), 'ID inválido', 'error');
+      if (!confirm('Eliminar propiedad ' + id + '?')) return;
+      try{
+        const res = await fetch(API_BASE + '/' + id, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Error al eliminar: ' + res.status);
+        showMessage(document.getElementById('modMsg'), 'Eliminada ID ' + id, 'success');
+        document.getElementById('modForm').reset();
+        fetchList();
+      }catch(err){
+        showMessage(document.getElementById('modMsg'), err.message, 'error');
+      }
+    });
+
+    // Table buttons (edit / delete)
+    document.querySelector('#tbl tbody').addEventListener('click', async (ev)=>{
+      const btn = ev.target.closest('button');
+      if (!btn) return;
+      const id = btn.dataset.id;
+      if (btn.classList.contains('btn-edit')){
+        document.getElementById('m_id').value = id;
+        document.getElementById('btnGet').click();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (btn.classList.contains('btn-del')){
+        if (!confirm('Eliminar propiedad ' + id + '?')) return;
+        try{
+          const res = await fetch(API_BASE + '/' + id, { method: 'DELETE' });
+          if (!res.ok) throw new Error('Error al eliminar: ' + res.status);
+          showMessage(document.getElementById('listMsg'), 'Eliminada ID ' + id, 'success');
+          fetchList();
+        }catch(err){
+          showMessage(document.getElementById('listMsg'), err.message, 'error');
+        }
+      }
+    });
+
+    // Escape HTML to avoid XSS in table
+    function escapeHtml(s){
+      return s.replace(/[&<>\"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+      });
+    }
+
+    // Refresh button
+    document.getElementById('btnRefresh').addEventListener('click', fetchList);
+
+    // Inicial
+    fetchList();
+</script>
+</body>
+</html>
