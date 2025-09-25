@@ -186,7 +186,7 @@
       if (!isFinite(size) || size <= 0) return showMessage(document.getElementById('modMsg'), 'Size debe ser número positivo', 'error');
 
       try{
-        const res = await fetch(API_BASE + '/' + id, {
+        const res = await fetch(API_BASE , {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id, address, price, size, description })

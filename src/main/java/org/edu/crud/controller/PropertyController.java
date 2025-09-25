@@ -3,6 +3,7 @@ package org.edu.crud.controller;
 
 import org.edu.crud.model.Property;
 import org.edu.crud.service.PropertyService;
+import org.hibernate.PropertyNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/properties")
+@CrossOrigin("*")
 public class PropertyController {
 
 
@@ -50,5 +52,10 @@ public class PropertyController {
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
         service.delete(id);
+    }
+
+    @ExceptionHandler(PropertyNotFoundException.class)
+    public ResponseEntity<String> handleNotFound(PropertyNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
 }

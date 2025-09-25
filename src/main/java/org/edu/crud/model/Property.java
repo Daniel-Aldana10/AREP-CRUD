@@ -5,6 +5,7 @@ import lombok.*;
 @Data
 @Getter
 @Setter
+@Entity
 @Table(name = "properties")
 public class Property {
     @Id

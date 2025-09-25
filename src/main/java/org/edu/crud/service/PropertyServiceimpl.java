@@ -2,9 +2,11 @@ package org.edu.crud.service;
 
 import org.edu.crud.model.Property;
 import org.edu.crud.repository.PropertyRepository;
+import org.hibernate.PropertyNotFoundException;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
-
+@Service
 public class PropertyServiceimpl implements PropertyService{
     private final PropertyRepository propertyRepository;
 
@@ -26,15 +28,12 @@ public class PropertyServiceimpl implements PropertyService{
 
     @Override
     public Property findById(Long idProperty) {
-        return propertyRepository.findById(idProperty).orElse(null);
+        return propertyRepository.findById(idProperty).orElseThrow(() -> new PropertyNotFoundException("Property with id " +idProperty.toString() + " not found"));
     }
 
     @Override
     public Property update(Property property) {
-        Property propertyOld = propertyRepository.findById(property.getId()).orElse(null);
-        if(propertyOld==null){
-            throw new IllegalArgumentException("Property not found with id: " + property.getId());
-        }
+        Property propertyOld = findById(property.getId());
         propertyOld.setAddress(property.getAddress());
         propertyOld.setSize(property.getSize());
         propertyOld.setPrice(property.getPrice());
